@@ -1,4 +1,4 @@
-module github.com/hashicorp/terraform-provider-scaffolding-framework
+module github.com/AvoidMe/terraform-provider-virtualbox
 
 go 1.18
 
