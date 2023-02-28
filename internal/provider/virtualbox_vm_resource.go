@@ -33,16 +33,14 @@ type VirtualboxVMResource struct {
 
 // VirtualboxVMResourceModel describes the resource data model.
 type VirtualboxVMResourceModel struct {
-	Id     types.String `tfsdk:"id"`
-	Name   types.String `tfsdk:"name"`
-	Image  types.String `tfsdk:"image"`
-	Cpu    types.Int64  `tfsdk:"cpu"`
-	Memory types.Int64  `tfsdk:"memory"`
-	Nic    struct {
-		Type          types.String `tfsdk:"type"`
-		HostInterface types.String `tfsdk:"host_interface"`
-	} `tfsdk:"nic"`
-	IPV4Adress types.String `tfsdk:"ipv4_address"`
+	Id      types.String `tfsdk:"id"`
+	Name    types.String `tfsdk:"name"`
+	Image   types.String `tfsdk:"image"`
+	SSHUser types.String `tfsdk:"ssh_user"`
+	SSHKey  types.String `tfsdk:"ssh_key"`
+	Cpu     types.Int64  `tfsdk:"cpu"`
+	Memory  types.Int64  `tfsdk:"memory"`
+	SSHPort types.String `tfsdk:"ssh_port"`
 }
 
 func (r *VirtualboxVMResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -72,6 +70,16 @@ func (r *VirtualboxVMResource) Schema(ctx context.Context, req resource.SchemaRe
 				Optional:            false,
 				Required:            true,
 			},
+			"ssh_user": schema.StringAttribute{
+				MarkdownDescription: "User for which ssh key will be injected. Root by default.",
+				Optional:            true,
+				Required:            false,
+			},
+			"ssh_key": schema.StringAttribute{
+				MarkdownDescription: "Path to public ssh key, will be inserted into authorized_keys of guest vm",
+				Optional:            true,
+				Required:            false,
+			},
 			"cpu": schema.Int64Attribute{
 				MarkdownDescription: "Virtualbox vm cpu count",
 				Optional:            false,
@@ -82,25 +90,8 @@ func (r *VirtualboxVMResource) Schema(ctx context.Context, req resource.SchemaRe
 				Optional:            false,
 				Required:            true,
 			},
-			"nic": schema.SingleNestedAttribute{
-				MarkdownDescription: "Virtualbox network interface",
-				Optional:            true,
-				Required:            false,
-				Attributes: map[string]schema.Attribute{
-					"type": schema.StringAttribute{
-						MarkdownDescription: "Virtualbox network type",
-						Optional:            true,
-						Required:            false,
-					},
-					"host_interface": schema.StringAttribute{
-						MarkdownDescription: "Virtualbox network host interface",
-						Optional:            true,
-						Required:            false,
-					},
-				},
-			},
-			"ipv4_address": schema.StringAttribute{
-				MarkdownDescription: "IPv4 Adress of VM",
+			"ssh_port": schema.StringAttribute{
+				MarkdownDescription: "Forwarded local port to guest ssh(22)",
 				Computed:            true,
 			},
 		},
@@ -137,11 +128,6 @@ func (r *VirtualboxVMResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	nic := virtualboxapi.VirtualboxNicInfo{
-		Type:          data.Nic.Type.ValueString(),
-		HostInterface: data.Nic.HostInterface.ValueString(),
-	}
-
 	vmInfo, err := virtualboxapi.CreateVM(
 		data.Image.ValueString(),
 		data.Name.ValueString(),
@@ -152,11 +138,24 @@ func (r *VirtualboxVMResource) Create(ctx context.Context, req resource.CreateRe
 		resp.Diagnostics.AddError("Error creating new vm", err.Error())
 		return
 	}
-	vmInfo, err = virtualboxapi.ModifyNIC(vmInfo, nic)
-	if err != nil {
-		resp.Diagnostics.AddError("Error setuping nic", err.Error())
-		return
+
+	if !data.SSHKey.IsNull() {
+		vmInfo, err = virtualboxapi.ForwardLocalPort(vmInfo.ID, 22)
+		if err != nil {
+			resp.Diagnostics.AddError("Error forwarding local port", err.Error())
+			return
+		}
+		sshUser := "root"
+		if !data.SSHUser.IsNull() {
+			sshUser = data.SSHUser.ValueString()
+		}
+		err = virtualboxapi.InjectSSHKey(vmInfo.ID, sshUser, data.SSHKey.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError("Error injecting ssh key", err.Error())
+			return
+		}
 	}
+
 	vmInfo, err = virtualboxapi.StartVM(
 		vmInfo.ID,
 		virtualboxapi.Headless, // TODO: add to schema, with default = headless
@@ -168,7 +167,7 @@ func (r *VirtualboxVMResource) Create(ctx context.Context, req resource.CreateRe
 
 	// save into the Terraform state.
 	data.Id = types.StringValue(vmInfo.ID)
-	data.IPV4Adress = types.StringValue(vmInfo.IPv4)
+	data.SSHPort = types.StringValue(vmInfo.SSHPort)
 
 	// Write logs using the tflog package
 	// Documentation: https://terraform.io/plugin/log
@@ -193,7 +192,7 @@ func (r *VirtualboxVMResource) Read(ctx context.Context, req resource.ReadReques
 		resp.Diagnostics.AddError("Error getting vm info", err.Error())
 		return
 	}
-	data.IPV4Adress = types.StringValue(vminfo.IPv4)
+	data.SSHPort = types.StringValue(vminfo.SSHPort)
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

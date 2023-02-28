@@ -4,14 +4,24 @@ package virtualboxapi
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
+	"io"
+	"os"
 	"os/exec"
+	"path"
 	"strings"
+
+	"github.com/hashicorp/packer-plugin-sdk/net"
 )
 
 type VMBootType string
 type NetworkType string
+
+const (
+	SshPortRuleName = "terraform_ssh_port_rule"
+)
 
 const (
 	Gui      VMBootType = "gui"
@@ -30,15 +40,11 @@ const (
 )
 
 type VirtualboxVMInfo struct {
-	ID    string
-	Name  string
-	State string
-	IPv4  string
-}
-
-type VirtualboxNicInfo struct {
-	Type          string
-	HostInterface string
+	ID       string
+	Name     string
+	State    string
+	VmdkPath string
+	SSHPort  string
 }
 
 func runGetOutput(cmd *exec.Cmd) (string, string, error) {
@@ -47,21 +53,6 @@ func runGetOutput(cmd *exec.Cmd) (string, string, error) {
 	cmd.Stderr = &stderr
 	err := cmd.Run()
 	return stdout.String(), stderr.String(), err
-}
-
-func ModifyNIC(vminfo *VirtualboxVMInfo, nic VirtualboxNicInfo) (*VirtualboxVMInfo, error) {
-	cmd := exec.Command(
-		"VBoxManage",
-		"modifyvm",
-		vminfo.ID,
-		fmt.Sprintf("--nic1=%s", nic.Type),
-		fmt.Sprintf("--bridge-adapter1=%s", nic.HostInterface), // TODO: this should be optional
-	)
-	_, stderr, err := runGetOutput(cmd)
-	if err != nil {
-		return nil, errors.New(stderr)
-	}
-	return GetVMInfo(vminfo.ID)
 }
 
 func CreateVM(imagePath, vmName string, memory, cpus int64) (*VirtualboxVMInfo, error) {
@@ -75,6 +66,17 @@ func CreateVM(imagePath, vmName string, memory, cpus int64) (*VirtualboxVMInfo, 
 		fmt.Sprintf("--cpus=%d", cpus),
 	)
 	_, stderr, err := runGetOutput(cmd)
+	if err != nil {
+		return nil, errors.New(stderr)
+	}
+	cmd = exec.Command(
+		"VBoxManage",
+		"modifyvm",
+		vmName,
+		"--nat-localhostreachable1",
+		"on",
+	)
+	_, stderr, err = runGetOutput(cmd)
 	if err != nil {
 		return nil, errors.New(stderr)
 	}
@@ -182,13 +184,113 @@ func GetVMInfo(vmName string) (*VirtualboxVMInfo, error) {
 			result.ID = vmInfoValueToString(keyValue[1])
 		case "VMState":
 			result.State = vmInfoValueToString(keyValue[1])
-		}
-	}
-	if result.State == "running" {
-		ip, err := GetVmIp(result)
-		if err == nil {
-			result.IPv4 = ip
+		case "\"SATA Controller-0-0\"":
+			result.VmdkPath = vmInfoValueToString(keyValue[1])
+		case "Forwarding(0)":
+			splited := strings.Split(vmInfoValueToString(keyValue[1]), ",")
+			result.SSHPort = splited[len(splited)-3]
 		}
 	}
 	return result, nil
+}
+
+func ForwardLocalPort(vmName string, guestPort int) (*VirtualboxVMInfo, error) {
+	ctx := context.Background()
+	port, err := net.ListenRangeConfig{
+		Addr:    "127.0.0.1",
+		Min:     7000,
+		Max:     8000,
+		Network: "tcp",
+	}.Listen(ctx)
+	if err != nil {
+		err := fmt.Errorf("Error creating port forwarding rule: %s", err)
+		return nil, err
+	}
+	port.Listener.Close()
+
+	// Make sure to configure the network interface to NAT
+	cmd := exec.Command(
+		"VBoxManage",
+		"modifyvm",
+		vmName,
+		"--nic1",
+		"nat",
+	)
+	_, stderr, err := runGetOutput(cmd)
+	if err != nil {
+		return nil, errors.New(stderr)
+	}
+
+	// Create a forwarded port mapping to the VM
+	cmd = exec.Command(
+		"VBoxManage",
+		"modifyvm",
+		vmName,
+		"--natpf1",
+		fmt.Sprintf("%s,tcp,127.0.0.1,%d,,%d", SshPortRuleName, port.Port, guestPort),
+	)
+	_, stderr, err = runGetOutput(cmd)
+	if err != nil {
+		return nil, errors.New(stderr)
+	}
+	return GetVMInfo(vmName)
+}
+
+func InjectSSHKey(vmName, sshUser, sshKey string) error {
+	vminfo, err := GetVMInfo(vmName)
+	if err != nil {
+		return err
+	}
+	// virt is not able to handle spaces in paths
+	// virtualbox usually call vm dirs like "VirtualBox VMs"
+	imageName := path.Base(vminfo.VmdkPath)
+	tmpPath := path.Join("/tmp", imageName)
+
+	input, err := os.Open(vminfo.VmdkPath)
+	if err != nil {
+		return err
+	}
+	defer input.Close()
+
+	dst, err := os.Create(tmpPath)
+	if err != nil {
+		return err
+	}
+	defer dst.Close()
+	defer os.Remove(tmpPath)
+
+	_, err = io.Copy(dst, input)
+	if err != nil {
+		return err
+	}
+	err = dst.Sync()
+	if err != nil {
+		return err
+	}
+
+	cmd := exec.Command(
+		"virt-sysprep",
+		"-a",
+		tmpPath,
+		"--ssh-inject",
+		fmt.Sprintf("%s:file:%s", sshUser, sshKey),
+	)
+	_, stderr, err := runGetOutput(cmd)
+	if err != nil {
+		return errors.New(stderr)
+	}
+
+	_, err = dst.Seek(0, 0)
+	if err != nil {
+		return err
+	}
+	output, err := os.Create(vminfo.VmdkPath)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(output, dst)
+	if err != nil {
+		return err
+	}
+	return nil
 }
