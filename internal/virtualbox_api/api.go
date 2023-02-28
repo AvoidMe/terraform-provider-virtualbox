@@ -25,18 +25,18 @@ const (
 
 const (
 	Gui      VMBootType = "gui"
-	Headless            = "headless"
-	Sdl                 = "sdl"
-	Separate            = "separate"
+	Headless VMBootType = "headless"
+	Sdl      VMBootType = "sdl"
+	Separate VMBootType = "separate"
 )
 
 const (
 	Bridged     NetworkType = "bridged"
-	Nat                     = "nat"
-	Hostonly                = "nostonly"
-	Hostonlynet             = "hostonlynet"
-	Generic                 = "generic"
-	Natnetwork              = "natnetwork"
+	Nat         NetworkType = "nat"
+	Hostonly    NetworkType = "nostonly"
+	Hostonlynet NetworkType = "hostonlynet"
+	Generic     NetworkType = "generic"
+	Natnetwork  NetworkType = "natnetwork"
 )
 
 type VirtualboxVMInfo struct {
