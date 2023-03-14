@@ -17,10 +17,15 @@ import (
 )
 
 type VMBootType string
+type VMStateType string
 type NetworkType string
 
 const (
 	SshPortRuleName = "terraform_ssh_port_rule"
+)
+
+const (
+	Poweroff VMStateType = "poweroff"
 )
 
 const (
@@ -42,7 +47,7 @@ const (
 type VirtualboxVMInfo struct {
 	ID       string
 	Name     string
-	State    string
+	State    VMStateType
 	VmdkPath string
 	SSHPort  string
 }
@@ -111,7 +116,7 @@ func StopVM(vmName string) (*VirtualboxVMInfo, error) {
 	return GetVMInfo(vmName)
 }
 
-func DestroyVM(vmName string) error {
+func DeleteVM(vmName string) error {
 	// VBoxManage unregistervm <uuid | vmname> [--delete] [--delete-all]
 	cmd := exec.Command(
 		"VBoxManage",
@@ -125,6 +130,20 @@ func DestroyVM(vmName string) error {
 		return errors.New(stderr)
 	}
 	return nil
+}
+
+func DestroyVM(vmName string) error {
+	vminfo, err := GetVMInfo(vmName)
+	if err != nil {
+		// Machine is possibly already destroyed
+		return err
+	}
+	if vminfo.State != Poweroff {
+		_, _ = StopVM(vmName)
+		// we can't do anything at this point,
+		// so just ignoring error
+	}
+	return DeleteVM(vmName)
 }
 
 func vmInfoValueToString(value string) string {
@@ -183,7 +202,7 @@ func GetVMInfo(vmName string) (*VirtualboxVMInfo, error) {
 		case "UUID":
 			result.ID = vmInfoValueToString(keyValue[1])
 		case "VMState":
-			result.State = vmInfoValueToString(keyValue[1])
+			result.State = VMStateType(vmInfoValueToString(keyValue[1]))
 		case "\"SATA Controller-0-0\"":
 			result.VmdkPath = vmInfoValueToString(keyValue[1])
 		case "Forwarding(0)":
