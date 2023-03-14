@@ -136,6 +136,8 @@ func (r *VirtualboxVMResource) Create(ctx context.Context, req resource.CreateRe
 	)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating new vm", err.Error())
+		err = virtualboxapi.DestroyVM(data.Name.ValueString())
+		resp.Diagnostics.AddError("Error destroying vm", err.Error())
 		return
 	}
 
@@ -143,6 +145,8 @@ func (r *VirtualboxVMResource) Create(ctx context.Context, req resource.CreateRe
 		vmInfo, err = virtualboxapi.ForwardLocalPort(vmInfo.ID, 22)
 		if err != nil {
 			resp.Diagnostics.AddError("Error forwarding local port", err.Error())
+			err = virtualboxapi.DestroyVM(data.Name.ValueString())
+			resp.Diagnostics.AddError("Error destroying vm", err.Error())
 			return
 		}
 		sshUser := "root"
@@ -152,6 +156,8 @@ func (r *VirtualboxVMResource) Create(ctx context.Context, req resource.CreateRe
 		err = virtualboxapi.InjectSSHKey(vmInfo.ID, sshUser, data.SSHKey.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError("Error injecting ssh key", err.Error())
+			err = virtualboxapi.DestroyVM(data.Name.ValueString())
+			resp.Diagnostics.AddError("Error destroying vm", err.Error())
 			return
 		}
 	}
@@ -162,6 +168,8 @@ func (r *VirtualboxVMResource) Create(ctx context.Context, req resource.CreateRe
 	)
 	if err != nil {
 		resp.Diagnostics.AddError("Error starting new vm", err.Error())
+		err = virtualboxapi.DestroyVM(data.Name.ValueString())
+		resp.Diagnostics.AddError("Error destroying vm", err.Error())
 		return
 	}
 
@@ -222,15 +230,7 @@ func (r *VirtualboxVMResource) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 
-	_, err := virtualboxapi.StopVM(
-		data.Id.ValueString(),
-	)
-	if err != nil {
-		tflog.Error(ctx, err.Error())
-		resp.Diagnostics.AddError("Error stopping vm", err.Error())
-		return
-	}
-	err = virtualboxapi.DestroyVM(
+	err := virtualboxapi.DestroyVM(
 		data.Id.ValueString(),
 	)
 	if err != nil {
