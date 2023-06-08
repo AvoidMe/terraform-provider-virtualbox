@@ -31,5 +31,3 @@ Virtualbox VM resource
 
 - `id` (String) Example identifier
 - `ssh_port` (String) Forwarded local port to guest ssh(22)
-
-
