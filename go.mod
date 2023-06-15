@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/hashicorp/packer-plugin-sdk v0.4.0
 	github.com/hashicorp/terraform-plugin-docs v0.15.0
-	github.com/hashicorp/terraform-plugin-framework v1.3.0
+	github.com/hashicorp/terraform-plugin-framework v1.3.1
 	github.com/hashicorp/terraform-plugin-log v0.9.0
 )
 
