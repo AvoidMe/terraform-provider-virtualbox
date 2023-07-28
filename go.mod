@@ -3,7 +3,7 @@ module github.com/AvoidMe/terraform-provider-virtualbox
 go 1.18
 
 require (
-	github.com/hashicorp/packer-plugin-sdk v0.4.0
+	github.com/hashicorp/packer-plugin-sdk v0.5.0
 	github.com/hashicorp/terraform-plugin-docs v0.16.0
 	github.com/hashicorp/terraform-plugin-framework v1.3.3
 	github.com/hashicorp/terraform-plugin-log v0.9.0
@@ -46,7 +46,7 @@ require (
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/hashicorp/hc-install v0.5.2 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
-	github.com/hashicorp/hcl/v2 v2.16.1 // indirect
+	github.com/hashicorp/hcl/v2 v2.16.2 // indirect
 	github.com/hashicorp/serf v0.9.5 // indirect
 	github.com/hashicorp/terraform-exec v0.18.1 // indirect
 	github.com/hashicorp/terraform-json v0.17.1 // indirect
