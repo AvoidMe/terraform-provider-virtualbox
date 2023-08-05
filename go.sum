@@ -220,8 +220,8 @@ github.com/hashicorp/logutils v1.0.0/go.mod h1:QIAnNjmIWmVIIkWDTG1z5v++HQmx9WQRO
 github.com/hashicorp/mdns v1.0.1/go.mod h1:4gW7WsVCke5TE7EPeYliwHlRUyBtfCwuFwuMg2DmyNY=
 github.com/hashicorp/memberlist v0.2.2 h1:5+RffWKwqJ71YPu9mWsF7ZOscZmwfasdA8kbdC7AO2g=
 github.com/hashicorp/memberlist v0.2.2/go.mod h1:MS2lj3INKhZjWNqd3N0m3J+Jxf3DAOnAH9VT3Sh9MUE=
-github.com/hashicorp/packer-plugin-sdk v0.5.0 h1:NQF+x/ahJBlTusLuyITf95y1IlSYCmKOU7Dd2VYRznA=
-github.com/hashicorp/packer-plugin-sdk v0.5.0/go.mod h1:xMiaK2ryPLtaxwd0FZP7/S8hN+vBDYLaNiVr9hu9ZdA=
+github.com/hashicorp/packer-plugin-sdk v0.5.1 h1:ucXGWru98LsQrAWq8cEnaNN2Dvqw0HtyupAwNzrfy44=
+github.com/hashicorp/packer-plugin-sdk v0.5.1/go.mod h1:OKziA4fQodpIq5HzOpRNt+vLpRJae61Z4uVFbeMLgd8=
 github.com/hashicorp/serf v0.9.5 h1:EBWvyu9tcRszt3Bxp3KNssBMP1KuHWyO51lz9+786iM=
 github.com/hashicorp/serf v0.9.5/go.mod h1:UWDWwZeL5cuWDJdl0C6wrvrUwEqtQ4ZKBKKENpqIUyk=
 github.com/hashicorp/terraform-exec v0.18.1 h1:LAbfDvNQU1l0NOQlTuudjczVhHj061fNX5H8XZxHlH4=
